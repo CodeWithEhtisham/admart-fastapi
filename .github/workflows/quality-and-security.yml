@@ -1,0 +1,65 @@
+name: Quality and Security Checks
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff mypy pytest pytest-asyncio
+
+      - name: Lint and Format (Ruff)
+        run: |
+          ruff check . --fix && ruff format .
+
+      - name: Type check (Mypy)
+        continue-on-error: true # TODO: Flip to false once types are clean
+        run: |
+          mypy .
+
+      - name: Run tests (Pytest)
+        env:
+          DGX_FLUX_API_URL: http://localhost:8001
+          CORS_ORIGINS: http://localhost:5173
+        run: |
+          pytest || [ $? -eq 5 ]
+
+  security:
+    name: Security Scan (Semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        run: |
+          docker run --user $(id -u):$(id -g) --rm -v "${{ github.workspace }}:/src" semgrep/semgrep semgrep scan --sarif --output=semgrep.sarif --config=p/default --config=p/python --config=p/secrets --config=p/security-audit
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
