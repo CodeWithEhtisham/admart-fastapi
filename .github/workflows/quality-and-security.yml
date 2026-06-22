@@ -59,7 +59,7 @@ jobs:
           docker run --user $(id -u):$(id -g) --rm -v "${{ github.workspace }}:/src" semgrep/semgrep semgrep scan --sarif --output=semgrep.sarif --config=p/default --config=p/python --config=p/secrets --config=p/security-audit
 
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: semgrep.sarif
